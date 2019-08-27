@@ -51,7 +51,7 @@ object Program {
       print(s"Indexing '$fileName' -> ")
 
       val bfsrc = Source.fromFile(f)
-      val words: Set[String] = bfsrc.getLines.flatMap(_.split("\\W+")).toSet
+      val words: Set[String] = bfsrc.getLines.filter(_.trim != "").flatMap(_.split("\\W+")).toSet
       for (word <- words) {
         val files = idx.getOrElse(word, Set.empty)
         idx(word.toLowerCase) = (files + fileName)
@@ -72,7 +72,7 @@ object Program {
     print(s"search>")
     val searchString = readLine()
     if (searchString != ":quit") {
-      val terms = searchString.split("\\W+").map(_.toLowerCase)
+      val terms = searchString.split("""\W+""").map(_.toLowerCase)
       val hits = collection.mutable.Map.empty[String, Int]
       for (term <- terms) {
         for (file <- indexedFiles.index.getOrElse(term, Set.empty)) {
