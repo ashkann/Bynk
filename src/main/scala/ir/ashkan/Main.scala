@@ -1,8 +1,9 @@
 package ir.ashkan
 
 import java.io.File
+
 import scala.util.Try
-import scala.io.Source
+import scala.io.{Codec, Source}
 
 object Main extends App {
   Program
@@ -43,26 +44,33 @@ object Program {
   def index(file: File): Index = {
     val idx = collection.mutable.Map.empty[String, Set[String]]
     var nFiles = 0
-    var nWords = 0
+    var nErrors = 0
+    val codec = Codec("UTF-8")
 
     file.listFiles.filter(_.isFile).toList.foreach { f =>
       nFiles += 1
       val fileName = f.getName
       print(s"Indexing '$fileName' -> ")
 
-      val bfsrc = Source.fromFile(f)
-      val words: Set[String] = bfsrc.getLines.filter(_.trim != "").flatMap(_.split("\\W+")).toSet
-      for (word <- words) {
-        val files = idx.getOrElse(word, Set.empty)
-        idx(word.toLowerCase) = (files + fileName)
+      val bfsrc = Source.fromFile(f)(codec)
+      try {
+        val lines = bfsrc.getLines.filter(_.trim != "")
+        val words = lines.flatMap(_.split("\\W+")).toSet
+        for (word <- words) {
+          val files = idx.getOrElse(word, Set.empty)
+          idx(word.toLowerCase) = (files + fileName)
+        }
+        println(s"${words.size} words")
+      } catch {
+        case e =>
+          nErrors += 1
+          println(s"ERR ${e.getMessage}")
+      } finally {
+        bfsrc.close()
       }
-      println(s"${words.size} words")
-      bfsrc.close()
     }
 
-    //    println(idx)
-
-    println(s"Total $nFiles files and ${idx.keySet.size} words indexed.")
+    println(s"Total $nFiles files and ${idx.keySet.size} words indexed, $nErrors error(s) encountered.")
 
     Index(idx.toMap)
   }
@@ -80,11 +88,17 @@ object Program {
           hits(file) = oldScore + 1
         }
       }
+
+
       println(
-        hits.toMap.view
-          .mapValues(_ * 100 / terms.length)
-          .map[String](s => s"'${s._1}': ${s._2}%")
-          .mkString("  ")
+        if (hits.nonEmpty)
+          hits
+            .toMap
+            .view.mapValues(_ * 100 / terms.length)
+            .map[String](s => s"'${s._1}': ${s._2}%")
+            .mkString("  ")
+        else
+          "No matches found"
       )
 
       iterate(indexedFiles)
