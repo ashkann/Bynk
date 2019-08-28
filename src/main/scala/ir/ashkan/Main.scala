@@ -18,16 +18,6 @@ object Program {
 
   import scala.io.StdIn.readLine
 
-  case class Index(index: Map[String, Set[String]])
-
-  sealed trait ReadFileError
-
-  case object MissingPathArg extends ReadFileError
-
-  case class NotDirectory(error: String) extends ReadFileError
-
-  case class FileNotFound(t: Throwable) extends ReadFileError
-
   def readFile(args: Array[String]): Either[ReadFileError, File] = {
     for {
       path <- args.headOption.toRight(MissingPathArg)
@@ -43,38 +33,35 @@ object Program {
 
   def index(file: File): Index = {
     val idx = collection.mutable.Map.empty[String, Set[String]]
-    var nFiles = 0
-    var nErrors = 0
     val codec = Codec("UTF-8")
 
-    file.listFiles.filter(_.isFile).toList.foreach { f =>
-      nFiles += 1
+    val (files, words, errs) = file.listFiles.filter(_.isFile).toList.foldLeft((0, 0, 0)) { (n, f) =>
       val fileName = f.getName
       print(s"Indexing '$fileName' -> ")
 
-      val bfsrc = Source.fromFile(f)(codec)
-      val msg = Try {
-        val lines = bfsrc.getLines.filter(_.trim != "")
-        val words = lines.flatMap(_.split("\\W+")).toSet
-        for (word <- words) {
-          idx.updateWith(word.toLowerCase) {
-            case Some(files) => Option(files + fileName)
-            case None => Option(Set(fileName))
+      val src = Source.fromFile(f)(codec)
+      val (df, dw, de, result) = Try {
+        src
+          .getLines
+          .filter(_.trim != "")
+          .flatMap(_.split("\\W+"))
+          .toSet
+          .foldLeft(0) { (nw, word) =>
+            idx.updateWith(word.toLowerCase) {
+              case Some(files) => Option(files + fileName)
+              case None => Option(Set(fileName))
+            }
+            nw + 1
           }
-        }
-        words.size
-      }.fold(
-        { e =>
-          nErrors += 1
-          s"ERR ${e.getMessage}"
-        },
-        size => s"$size words"
-      )
-      println(msg)
-      bfsrc.close()
+      }.fold(e => (0, 0, 1, s"ERR ${e.getMessage}"), nw => (1, nw, 0, s"$nw words"))
+
+      println(result)
+      src.close()
+
+      ((f: Int, w: Int, e: Int) => (df + f, dw + w, de + e)).tupled(n)
     }
 
-    println(s"Total $nFiles files and ${idx.keySet.size} words indexed, $nErrors error(s) encountered.")
+    println(s"Total $files files and $words words indexed, $errs error(s) encountered.")
 
     Index(idx.toMap)
   }
@@ -110,4 +97,15 @@ object Program {
   }
 
   def score(): Unit = println("Working.")
+
+  sealed trait ReadFileError
+
+  case class Index(index: Map[String, Set[String]])
+
+  case class NotDirectory(error: String) extends ReadFileError
+
+  case class FileNotFound(t: Throwable) extends ReadFileError
+
+  case object MissingPathArg extends ReadFileError
+
 }
