@@ -53,7 +53,7 @@ object Program {
       print(s"Indexing '$fileName' -> ")
 
       val bfsrc = Source.fromFile(f)(codec)
-      try {
+      val msg = Try {
         val lines = bfsrc.getLines.filter(_.trim != "")
         val words = lines.flatMap(_.split("\\W+")).toSet
         for (word <- words) {
@@ -62,14 +62,16 @@ object Program {
             case None => Option(Set(fileName))
           }
         }
-        println(s"${words.size} words")
-      } catch {
-        case e =>
+        words.size
+      }.fold(
+        { e =>
           nErrors += 1
-          println(s"ERR ${e.getMessage}")
-      } finally {
-        bfsrc.close()
-      }
+          s"ERR ${e.getMessage}"
+        },
+        size => s"$size words"
+      )
+      println(msg)
+      bfsrc.close()
     }
 
     println(s"Total $nFiles files and ${idx.keySet.size} words indexed, $nErrors error(s) encountered.")
