@@ -57,8 +57,10 @@ object Program {
         val lines = bfsrc.getLines.filter(_.trim != "")
         val words = lines.flatMap(_.split("\\W+")).toSet
         for (word <- words) {
-          val files = idx.getOrElse(word, Set.empty)
-          idx(word.toLowerCase) = (files + fileName)
+          idx.updateWith(word.toLowerCase) {
+            case Some(files) => Option(files + fileName)
+            case None => Option(Set(fileName))
+          }
         }
         println(s"${words.size} words")
       } catch {
